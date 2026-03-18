@@ -78,16 +78,5 @@ export default async function OwnerNodePage({
         })),
       ];
 
-  const vaultItems = dbNode
-    ? dbNode.vaultItems.map((item) => ({
-        id: item.id,
-        title: item.title,
-        type: item.type,
-        externalUrl: item.externalUrl,
-        fileUrl: item.fileUrl,
-        linkedSpreadId: item.spreads[0]?.id ?? null,
-      }))
-    : [];
-
-  return <OwnerCabin nodeId={dbNode?.id ?? null} node={node} spreads={spreads} vaultItems={vaultItems} />;
+  return <OwnerCabin nodeId={dbNode?.id ?? null} node={node} spreads={spreads} />;
 }

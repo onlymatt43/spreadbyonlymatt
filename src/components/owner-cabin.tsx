@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SpreadKind } from "@prisma/client";
 
 type CabinSpread = {
   id: string;
@@ -19,28 +20,17 @@ type OwnerCabinProps = {
     videoUrl: string | null;
   };
   spreads: CabinSpread[];
-  vaultItems: {
-    id: string;
-    title: string;
-    type: string;
-    externalUrl: string | null;
-    fileUrl: string | null;
-    linkedSpreadId: string | null;
-  }[];
 };
 
-export function OwnerCabin({ nodeId, node, spreads, vaultItems }: OwnerCabinProps) {
+export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
   const router = useRouter();
-  const [activeSpreadId, setActiveSpreadId] = useState<string | null>(() => {
-    const firstCommons = spreads.find((spread) => spread.audience === "commons");
-    return firstCommons?.id ?? null;
-  });
+  const [activeSpreadId, setActiveSpreadId] = useState<string | null>(null);
   const [items, setItems] = useState(spreads);
+  const [newSpreadLabel, setNewSpreadLabel] = useState("");
+  const [addingSpread, setAddingSpread] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [publishingVaultId, setPublishingVaultId] = useState<string | null>(null);
   const [recentlyDimmedId, setRecentlyDimmedId] = useState<string | null>(null);
-  const [vault, setVault] = useState(vaultItems);
   const calmTimerRef = useRef<number | null>(null);
 
   function markDimmed(spreadId: string | null) {
@@ -106,6 +96,55 @@ export function OwnerCabin({ nodeId, node, spreads, vaultItems }: OwnerCabinProp
     return [...mesh, ...commons];
   }, [items]);
 
+  async function addSpread() {
+    if (!nodeId || !newSpreadLabel.trim() || addingSpread) {
+      return;
+    }
+
+    setAddingSpread(true);
+
+    try {
+      const label = newSpreadLabel.trim();
+      const response = await fetch(`/api/node-by-id/${nodeId}/spreads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label,
+          kind: /^https?:\/\//i.test(label) || label.includes(".") ? "link" : "custom",
+          audience: "mesh",
+          externalUrl:
+            /^https?:\/\//i.test(label) || label.includes(".")
+              ? (/^https?:\/\//i.test(label) ? label : `https://${label}`)
+              : null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create spread.");
+      }
+
+      setItems((prev) => [
+        {
+          id: data.spread.id,
+          label: data.spread.label,
+          audience: data.spread.audience,
+        },
+        ...prev,
+      ]);
+      setNewSpreadLabel("");
+      markDimmed(data.spread.id);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAddingSpread(false);
+    }
+  }
+
   async function addUploadedSpread(file: File) {
     if (!nodeId || uploadingFile) {
       return;
@@ -127,36 +166,32 @@ export function OwnerCabin({ nodeId, node, spreads, vaultItems }: OwnerCabinProp
         throw new Error(uploadData.error || "Upload failed.");
       }
 
-      const vaultResponse = await fetch(`/api/node-by-id/${nodeId}/vault`, {
+      const spreadResponse = await fetch(`/api/node-by-id/${nodeId}/spreads`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           label: file.name,
-          title: file.name,
-          type: file.type.startsWith("image/") || file.type.startsWith("video/") ? "media" : "document",
+          kind:
+            file.type && (file.type.startsWith("image/") || file.type.startsWith("video/"))
+              ? SpreadKind.document
+              : SpreadKind.document,
+          audience: "mesh",
           fileUrl: uploadData.url,
-          metaJson: {
-            pathname: uploadData.pathname,
-            contentType: uploadData.contentType,
-          },
         }),
       });
-      const vaultData = await vaultResponse.json();
+      const spreadData = await spreadResponse.json();
 
-      if (!vaultResponse.ok) {
-        throw new Error(vaultData.error || "Failed to create vault item from upload.");
+      if (!spreadResponse.ok) {
+        throw new Error(spreadData.error || "Failed to create spread from upload.");
       }
 
-      setVault((prev) => [
+      setItems((prev) => [
         {
-          id: vaultData.item.id,
-          title: vaultData.item.title,
-          type: vaultData.item.type,
-          externalUrl: vaultData.item.externalUrl,
-          fileUrl: vaultData.item.fileUrl,
-          linkedSpreadId: null,
+          id: spreadData.spread.id,
+          label: spreadData.spread.label,
+          audience: spreadData.spread.audience,
         },
         ...prev,
       ]);
@@ -169,85 +204,11 @@ export function OwnerCabin({ nodeId, node, spreads, vaultItems }: OwnerCabinProp
     }
   }
 
-  async function sendVaultItemToNode(itemId: string) {
-    if (!nodeId || publishingVaultId) {
-      return;
-    }
-
-    const item = vault.find((entry) => entry.id === itemId);
-
-    if (!item || item.linkedSpreadId) {
-      return;
-    }
-
-    setPublishingVaultId(itemId);
-
-    try {
-      const response = await fetch(`/api/node-by-id/${nodeId}/spreads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          label: item.title,
-          kind: item.externalUrl && !item.fileUrl ? "link" : "document",
-          audience: "mesh",
-          vaultItemId: item.id,
-          externalUrl: item.externalUrl,
-          fileUrl: item.fileUrl,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to publish vault item.");
-      }
-
-      setItems((prev) => [
-        ...prev,
-        {
-          id: data.spread.id,
-          label: data.spread.label,
-          audience: data.spread.audience,
-        },
-      ]);
-      setVault((prev) =>
-        prev.map((entry) =>
-          entry.id === itemId ? { ...entry, linkedSpreadId: data.spread.id } : entry
-        )
-      );
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setPublishingVaultId(null);
-    }
-  }
-
   return (
-    <div
-      className={`relative min-h-[calc(100vh-73px)] overflow-hidden transition-colors duration-700 ${
-        activeSpreadId ? "bg-[#0e0e0e]" : "bg-transparent"
-      }`}
-    >
-      <div
-        className={`absolute inset-0 transition-opacity duration-700 ${
-          activeSpreadId ? "opacity-100" : "opacity-0"
-        }`}
-        style={{
-          background:
-            "radial-gradient(circle at center, rgba(255,255,255,0.045), transparent 46%), linear-gradient(180deg, rgba(4,4,4,0.45), rgba(4,4,4,0.72))",
-        }}
-      />
-
+    <div className="relative min-h-[calc(100vh-73px)] overflow-hidden">
       <main className="relative mx-auto grid min-h-[calc(100vh-73px)] max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <section className="relative order-2 lg:order-1">
-          <div
-            className={`absolute inset-0 translate-x-6 translate-y-6 rounded-[2.2rem] border border-white/10 bg-[#151515] transition-all duration-700 ${
-              activeSpreadId ? "opacity-100" : "opacity-88"
-            }`}
-          />
+          <div className="absolute inset-0 translate-x-6 translate-y-6 rounded-[2.2rem] border border-white/10 bg-[#151515] opacity-88 transition-all duration-700" />
           <div className="relative rounded-[2.2rem] border border-[var(--line)] bg-[var(--panel)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.08)]">
             <div className="relative h-56 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(135deg,#fff1ae,transparent_55%),linear-gradient(180deg,#161616,#393939)]">
               {node.videoUrl ? (
@@ -310,115 +271,78 @@ export function OwnerCabin({ nodeId, node, spreads, vaultItems }: OwnerCabinProp
               </span>
             </div>
 
-            <div className="mt-8">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Spreads</p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                {orderedSpreads.length === 0 ? (
-                  <div className="rounded-full border border-white/10 px-4 py-3 text-sm text-white/55">
-                    No spreads yet
-                  </div>
-                ) : (
-                  orderedSpreads.map((spread) => {
-                    const isActive = spread.audience === "commons";
-                    const isPending = pendingId === spread.id;
-
-                    return (
-                      <button
-                        key={spread.id}
-                        type="button"
-                        onClick={() => toggleSpread(spread.id)}
-                        disabled={isPending}
-                        className={`relative rounded-full px-4 py-3 text-sm transition-all duration-300 ${
-                          isActive
-                            ? "bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.5)]"
-                            : recentlyDimmedId === spread.id
-                              ? "bg-black text-white ring-1 ring-white/16 shadow-[0_0_22px_rgba(255,255,255,0.08)]"
-                              : "bg-white/6 text-white/78 ring-1 ring-white/10 hover:bg-white/10 hover:text-white hover:ring-white/22"
-                        } ${isPending ? "opacity-60" : ""}`}
-                      >
-                        <span className="mr-2 inline-block h-2 w-2 rounded-full bg-current align-middle opacity-80" />
-                        {spread.label}
-                      </button>
-                    );
-                  })
-                )}
+            <div className="mt-8 space-y-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Add</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <input
+                    value={newSpreadLabel}
+                    onChange={(event) => setNewSpreadLabel(event.target.value)}
+                    placeholder="Add spread"
+                    className="min-w-0 flex-1 rounded-full border border-white/12 bg-black/25 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-white/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={addSpread}
+                    disabled={!nodeId || addingSpread || !newSpreadLabel.trim()}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 text-lg text-white transition hover:border-white/30 disabled:opacity-40"
+                  >
+                    {addingSpread ? "…" : "+"}
+                  </button>
+                  <label className="inline-flex cursor-pointer rounded-full border border-white/12 px-4 py-3 text-sm text-white/78 transition hover:border-white/30">
+                    {uploadingFile ? "Uploading..." : "Upload file"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          void addUploadedSpread(file);
+                          event.currentTarget.value = "";
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-8 rounded-[1.4rem] border border-white/10 bg-black/20 p-5">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Vault</p>
-              <p className="mt-3 text-sm leading-7 text-white/58">Reserve. Send to the Node when ready.</p>
-              <label className="mt-4 inline-flex cursor-pointer rounded-full border border-white/12 px-4 py-3 text-sm text-white/78 transition hover:border-white/30">
-                {uploadingFile ? "Uploading..." : "Upload file"}
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void addUploadedSpread(file);
-                      event.currentTarget.value = "";
-                    }
-                  }}
-                />
-              </label>
-              <div className="mt-4 flex flex-col gap-3">
-                {vault.length === 0 ? (
-                  <div className="rounded-[1.1rem] border border-white/10 px-4 py-4 text-sm text-white/45">
-                    Vault is empty.
-                  </div>
-                ) : (
-                  vault.map((item) => {
-                    const isPublished = Boolean(item.linkedSpreadId);
-                    const source = item.fileUrl || item.externalUrl;
+              <div className="rounded-[1.4rem] border border-white/10 bg-black/15 p-5">
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Spreads</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {orderedSpreads.length === 0 ? (
+                    <div className="rounded-full border border-white/10 px-4 py-3 text-sm text-white/55">
+                      No spreads yet
+                    </div>
+                  ) : (
+                    orderedSpreads.map((spread) => {
+                      const isActive = spread.audience === "commons";
+                      const isPending = pendingId === spread.id;
 
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex flex-col gap-3 rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white/45">
-                              {item.type}
-                            </span>
-                            {isPublished ? (
-                              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white/55">
-                                In Node
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 truncate text-sm text-white">{item.title}</p>
-                          {source ? (
-                            <p className="mt-1 truncate text-xs text-white/35">{source}</p>
-                          ) : null}
-                        </div>
+                      return (
                         <button
+                          key={spread.id}
                           type="button"
-                          onClick={() => sendVaultItemToNode(item.id)}
-                          disabled={isPublished || publishingVaultId === item.id}
-                          className="rounded-full border border-white/12 px-4 py-2 text-sm text-white transition hover:border-white/28 disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={() => toggleSpread(spread.id)}
+                          disabled={isPending}
+                          className={`relative rounded-full px-4 py-3 text-sm transition-all duration-300 ${
+                            isActive
+                              ? "bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.5)]"
+                              : recentlyDimmedId === spread.id
+                                ? "bg-black text-white ring-1 ring-white/16 shadow-[0_0_22px_rgba(255,255,255,0.08)]"
+                                : "bg-white/6 text-white/78 ring-1 ring-white/10 hover:bg-white/10 hover:text-white hover:ring-white/22"
+                          } ${isPending ? "opacity-60" : ""}`}
                         >
-                          {publishingVaultId === item.id ? "Sending..." : isPublished ? "Sent" : "To Node"}
+                          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-current align-middle opacity-80" />
+                          {spread.label}
                         </button>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div
-            className={`pointer-events-none absolute left-[-10%] top-[52%] hidden h-px w-[70%] origin-left transition-all duration-500 lg:block ${
-              activeSpreadId ? "opacity-100" : "opacity-30"
-            }`}
-            style={{
-              background:
-                "linear-gradient(90deg, rgba(255,255,255,0.7), rgba(240,199,74,0.95), rgba(240,199,74,0))",
-              boxShadow: activeSpreadId ? "0 0 18px rgba(240,199,74,0.6)" : "none",
-            }}
-          />
         </section>
       </main>
     </div>

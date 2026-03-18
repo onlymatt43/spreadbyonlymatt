@@ -91,13 +91,10 @@ Use it to track:
 - softened dimming and glow
 - made black spreads in cabin calm down after activation
 
-### Vault now works as a reserve
+### Vault/Spreads simplification
 
-- upload no longer creates a spread directly
-- upload now creates a `VaultItem`
-- Vault items are listed in the cabin
-- each Vault item can be sent into the Node with `To Node`
-- sending from Vault creates a linked `mesh` spread
+- upload crée directement un spread `mesh` (plus de liste Vault séparée, plus de `To Node`)
+- un seul bloc “Spreads” dans la cabine regroupe ajout texte et uploads
 
 ### Documentation
 

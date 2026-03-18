@@ -245,15 +245,11 @@ Page:
 Current behavior:
 - left = vitrine
 - right = cabin
-- add spread with mini input + `+`
-- new spread starts in `mesh`
+- add spread with mini input + `+` → starts in `mesh`
 - click spread to toggle `mesh <-> commons`
-- dim/glow behavior exists
-- upload file to Blob test flow exists from the Vault area
-- uploaded file now lands in the `Vault`, not directly in `Spreads`
-- Vault items are listed in the cabin
-- each Vault item can be sent into the Node with `To Node`
-- sending from Vault creates a new `mesh` spread linked to the Vault item
+- upload file to Blob test flow: upload crée directement un spread `mesh`
+- tous les spreads (ajout texte ou upload) sont listés dans un seul bloc
+- pas de liste Vault séparée, pas de bouton `To Node`
 
 ### 8.4 Public node
 
