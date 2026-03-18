@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum OwnerStatus {
+  pending
+  active
+}
+
+enum VaultItemType {
+  link
+  document
+  proof
+  authorization
+  analysis
+  media
+  note
+}
+
+enum SpreadKind {
+  link
+  document
+  proof
+  service
+  promo
+  signal_entry
+  custom
+}
+
+enum SpreadAudience {
+  commons
+  mesh
+}
+
+enum EmailIntent {
+  owner
+  action
+}
+
+enum SignalType {
+  spread_it
+  request
+  suggestion
+  collab_idea
+}
+
+enum SignalStatus {
+  new
+  seen
+  closed
+}
+
+model Owner {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  status    OwnerStatus @default(pending)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  node      Node?
+}
+
+model Node {
+  id           String      @id @default(cuid())
+  ownerId      String      @unique
+  slug         String      @unique
+  displayName  String
+  mainLink     String
+  mainPlatform String?
+  mainUsername String?
+  shortBio     String?
+  photoUrl     String?
+  videoUrl     String?
+  isLive       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  owner        Owner       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  vaultItems   VaultItem[]
+  spreads      Spread[]
+  signals      Signal[]
+}
+
+model VaultItem {
+  id          String        @id @default(cuid())
+  nodeId      String
+  type        VaultItemType
+  title       String
+  contentText String?
+  externalUrl String?
+  fileUrl     String?
+  metaJson    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  node        Node          @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  spreads     Spread[]
+
+  @@index([nodeId])
+}
+
+model Spread {
+  id          String         @id @default(cuid())
+  nodeId      String
+  vaultItemId String?
+  label       String
+  kind        SpreadKind
+  contentText String?
+  externalUrl String?
+  fileUrl     String?
+  audience    SpreadAudience
+  sortOrder   Int            @default(0)
+  isPublished Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  node        Node           @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  vaultItem   VaultItem?     @relation(fields: [vaultItemId], references: [id], onDelete: SetNull)
+
+  @@index([nodeId])
+  @@index([audience])
+}
+
+model EmailSession {
+  id        String      @id @default(cuid())
+  email     String
+  intent    EmailIntent
+  tokenHash String      @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([email])
+}
+
+model Signal {
+  id          String       @id @default(cuid())
+  nodeId      String
+  senderEmail String
+  type        SignalType
+  subject     String?
+  message     String
+  status      SignalStatus @default(new)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  node        Node         @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([status])
+}
