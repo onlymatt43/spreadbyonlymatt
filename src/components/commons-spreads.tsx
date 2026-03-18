@@ -20,6 +20,31 @@ export function CommonsSpreads({ items }: Props) {
   const [softClosing, setSoftClosing] = useState<string | null>(null);
   const collapseTimerRef = useRef<number | null>(null);
 
+  function isDownloadable(href: string | null) {
+    if (!href) return false;
+    const lower = href.toLowerCase();
+    return [
+      ".pdf",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".webp",
+      ".mp4",
+      ".mov",
+      ".zip",
+      ".doc",
+      ".docx",
+      ".ppt",
+      ".pptx",
+      ".xls",
+      ".xlsx",
+      ".txt",
+      ".csv",
+      ".heic",
+    ].some((ext) => lower.includes(ext));
+  }
+
   function clearCollapseTimer() {
     if (collapseTimerRef.current) {
       window.clearTimeout(collapseTimerRef.current);
@@ -115,6 +140,15 @@ export function CommonsSpreads({ items }: Props) {
                   className="rounded-full bg-black px-3 py-2 text-xs font-medium text-white transition-all duration-300 hover:bg-[var(--accent)] hover:text-black"
                 >
                   Open
+                </a>
+              ) : null}
+              {isDownloadable(item.href) ? (
+                <a
+                  href={item.href!}
+                  download
+                  className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-medium text-black transition-all duration-300 hover:border-black/25"
+                >
+                  Download
                 </a>
               ) : null}
               <button
