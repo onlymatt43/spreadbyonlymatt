@@ -4,7 +4,6 @@ import { SpreadAudience } from "@prisma/client";
 import { featuredNodes } from "@/lib/content";
 import { getPrisma } from "@/lib/prisma";
 import { parseSpreadLink } from "@/lib/utils";
-import { CommonsSpreads } from "@/components/commons-spreads";
 import { NodeCard } from "@/components/node-card";
 
 export default async function NodePage({
@@ -71,25 +70,55 @@ export default async function NodePage({
   });
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col gap-10 px-6 py-12">
-      <section className="space-y-6">
-        <NodeCard
-          handle={normalizedNode.handle}
-          mainLink={normalizedNode.mainLink}
-          displayName={normalizedNode.displayName}
-          photoUrl={normalizedNode.photoUrl}
-          videoUrl={normalizedNode.videoUrl}
-        />
-        <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--panel)] p-8">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm uppercase tracking-[0.28em] text-[var(--muted)]">
-              Commons spreads
-            </p>
-            <button className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)]">
-              Spread It
-            </button>
+    <main className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col gap-6 px-6 py-12">
+      <section className="rounded-[2rem] border border-[var(--line)] bg-[var(--panel)] p-8">
+        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <NodeCard
+            handle={normalizedNode.handle}
+            mainLink={normalizedNode.mainLink}
+            displayName={normalizedNode.displayName}
+            photoUrl={normalizedNode.photoUrl}
+            videoUrl={normalizedNode.videoUrl}
+            commons={commonsSpreadItems.slice(0, 4).map((item) => ({
+              icon: item.icon,
+              display: item.display,
+            }))}
+          />
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm uppercase tracking-[0.28em] text-[var(--muted)]">
+                Commons spreads
+              </p>
+              <button className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)]">
+                Spread It
+              </button>
+            </div>
+            <div className="rounded-[1.2rem] border border-[var(--line)] bg-white p-4">
+              <div className="text-sm text-[var(--muted)]">Public spreads</div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {commonsSpreadItems.length === 0 ? (
+                  <div className="rounded-full border border-[var(--line)] px-3 py-2 text-sm text-[var(--muted)]">
+                    None yet
+                  </div>
+                ) : (
+                  commonsSpreadItems.map((item) => (
+                    <a
+                      key={item.raw}
+                      href={item.href || undefined}
+                      target={item.href ? "_blank" : undefined}
+                      rel={item.href ? "noreferrer" : undefined}
+                      className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-semibold text-[var(--canvas)]">
+                        {item.icon}
+                      </span>
+                      <span className="truncate max-w-[160px]">{item.display}</span>
+                    </a>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-          <CommonsSpreads items={commonsSpreadItems} />
         </div>
       </section>
       <section className="flex flex-wrap gap-3">
