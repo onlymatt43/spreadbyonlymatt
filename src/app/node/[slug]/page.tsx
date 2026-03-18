@@ -5,6 +5,7 @@ import { featuredNodes } from "@/lib/content";
 import { getPrisma } from "@/lib/prisma";
 import { parseSpreadLink } from "@/lib/utils";
 import { CommonsSpreads } from "@/components/commons-spreads";
+import { NodeCard } from "@/components/node-card";
 
 export default async function NodePage({
   params,
@@ -72,37 +73,13 @@ export default async function NodePage({
   return (
     <main className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col gap-10 px-6 py-12">
       <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--panel)] p-8">
-          <div className="relative h-56 overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#fff1ae,transparent_55%),linear-gradient(180deg,#161616,#393939)]">
-            {normalizedNode.videoUrl ? (
-              <video
-                key={normalizedNode.videoUrl}
-                src={normalizedNode.videoUrl}
-                className="h-full w-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            ) : normalizedNode.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={normalizedNode.photoUrl}
-                alt={normalizedNode.displayName}
-                className="h-full w-full object-cover"
-              />
-            ) : null}
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,241,174,0.45),transparent_45%),linear-gradient(180deg,transparent,rgba(0,0,0,0.18))]" />
-          </div>
-          <a
-            href={normalizedNode.mainLink}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-flex rounded-full bg-[var(--ink)] px-5 py-3 text-sm font-medium text-[var(--canvas)] transition hover:bg-[var(--accent)] hover:text-[var(--ink-strong)]"
-          >
-            {normalizedNode.handle}
-          </a>
-        </div>
+        <NodeCard
+          handle={normalizedNode.handle}
+          mainLink={normalizedNode.mainLink}
+          displayName={normalizedNode.displayName}
+          photoUrl={normalizedNode.photoUrl}
+          videoUrl={normalizedNode.videoUrl}
+        />
 
         <section className="rounded-[2rem] border border-[var(--line)] bg-[var(--panel)] p-8">
           <div className="flex items-center justify-between gap-4">

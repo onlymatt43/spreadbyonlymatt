@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SpreadKind } from "@prisma/client";
+import { NodeCard } from "@/components/node-card";
 
 type CabinSpread = {
   id: string;
@@ -29,9 +30,12 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
   const [newSpreadLabel, setNewSpreadLabel] = useState("");
   const [addingSpread, setAddingSpread] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [recentlyDimmedId, setRecentlyDimmedId] = useState<string | null>(null);
   const calmTimerRef = useRef<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
 
   function markDimmed(spreadId: string | null) {
     if (calmTimerRef.current) {
@@ -87,6 +91,77 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
       console.error(error);
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function setAudience(spreadId: string, audience: "mesh" | "commons") {
+    if (updatingId) return;
+    setUpdatingId(spreadId);
+    try {
+      const response = await fetch(`/api/spreads/${spreadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audience }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to update audience.");
+      setItems((prev) =>
+        prev.map((spread) =>
+          spread.id === spreadId ? { ...spread, audience: data.spread.audience } : spread
+        )
+      );
+      setActiveSpreadId(audience === "commons" ? spreadId : null);
+      markDimmed(audience === "mesh" ? spreadId : null);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function saveLabel(spreadId: string) {
+    if (!editLabel.trim() || updatingId) return;
+    setUpdatingId(spreadId);
+    try {
+      const response = await fetch(`/api/spreads/${spreadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: editLabel.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to update label.");
+      setItems((prev) =>
+        prev.map((spread) =>
+          spread.id === spreadId ? { ...spread, label: data.spread.label } : spread
+        )
+      );
+      setEditingId(null);
+      setEditLabel("");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function deleteSpread(spreadId: string) {
+    if (updatingId) return;
+    setUpdatingId(spreadId);
+    try {
+      const response = await fetch(`/api/spreads/${spreadId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to delete spread.");
+      setItems((prev) => prev.filter((spread) => spread.id !== spreadId));
+      if (activeSpreadId === spreadId) setActiveSpreadId(null);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setUpdatingId(null);
     }
   }
 
@@ -209,54 +284,13 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
       <main className="relative mx-auto grid min-h-[calc(100vh-73px)] max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <section className="relative order-2 lg:order-1">
           <div className="absolute inset-0 translate-x-6 translate-y-6 rounded-[2.2rem] border border-white/10 bg-[#151515] opacity-88 transition-all duration-700" />
-          <div className="relative rounded-[2.2rem] border border-[var(--line)] bg-[var(--panel)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.08)]">
-            <div className="relative h-56 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(135deg,#fff1ae,transparent_55%),linear-gradient(180deg,#161616,#393939)]">
-              {node.videoUrl ? (
-                <video
-                  key={node.videoUrl}
-                  src={node.videoUrl}
-                  className="h-full w-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                />
-              ) : node.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={node.photoUrl} alt={node.displayName} className="h-full w-full object-cover" />
-              ) : null}
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,241,174,0.45),transparent_45%),linear-gradient(180deg,transparent,rgba(0,0,0,0.18))]" />
-            </div>
-            <div className="relative z-10 -mt-10 ml-4 mb-4">
-              <div className="relative rounded-[1.4rem] border border-black/10 bg-white p-2 shadow-[0_14px_40px_rgba(0,0,0,0.14)]">
-                <div className="h-22 w-22 overflow-hidden rounded-[1rem] bg-[#d9d1c3] sm:h-24 sm:w-24">
-                  {node.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={node.photoUrl}
-                      alt={node.handle}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-black/55">
-                      {node.displayName.slice(0, 1)}
-                    </div>
-                  )}
-                </div>
-                <div className="absolute bottom-2 left-2 rounded-full bg-black/78 px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-white/78 backdrop-blur-sm">
-                  Node
-                </div>
-              </div>
-            </div>
-            <a
-              href={node.mainLink}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex rounded-full bg-[var(--ink)] px-5 py-3 text-sm font-medium text-[var(--canvas)] transition hover:bg-[var(--accent)] hover:text-[var(--ink-strong)]"
-            >
-              {node.handle}
-            </a>
-          </div>
+          <NodeCard
+            handle={node.handle}
+            mainLink={node.mainLink}
+            displayName={node.displayName}
+            photoUrl={node.photoUrl}
+            videoUrl={node.videoUrl}
+          />
         </section>
 
         <section className="relative order-1 lg:order-2">
@@ -316,25 +350,95 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
                   ) : (
                     orderedSpreads.map((spread) => {
                       const isActive = spread.audience === "commons";
-                      const isPending = pendingId === spread.id;
+                      const isBusy =
+                        pendingId === spread.id || updatingId === spread.id;
+                      const isEditing = editingId === spread.id;
 
                       return (
-                        <button
+                        <div
                           key={spread.id}
-                          type="button"
-                          onClick={() => toggleSpread(spread.id)}
-                          disabled={isPending}
-                          className={`relative rounded-full px-4 py-3 text-sm transition-all duration-300 ${
-                            isActive
-                              ? "bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.5)]"
-                              : recentlyDimmedId === spread.id
-                                ? "bg-black text-white ring-1 ring-white/16 shadow-[0_0_22px_rgba(255,255,255,0.08)]"
-                                : "bg-white/6 text-white/78 ring-1 ring-white/10 hover:bg-white/10 hover:text-white hover:ring-white/22"
-                          } ${isPending ? "opacity-60" : ""}`}
+                          className="flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3"
                         >
-                          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-current align-middle opacity-80" />
-                          {spread.label}
-                        </button>
+                          {isEditing ? (
+                            <div className="flex flex-1 min-w-0 items-center gap-2">
+                              <input
+                                value={editLabel}
+                                onChange={(e) => setEditLabel(e.target.value)}
+                                className="min-w-0 flex-1 rounded-full border border-white/12 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/30"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => saveLabel(spread.id)}
+                                disabled={!editLabel.trim() || isBusy}
+                                className="rounded-full border border-white/12 px-3 py-2 text-xs text-white transition hover:border-white/30 disabled:opacity-50"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setEditLabel("");
+                                }}
+                                className="rounded-full border border-white/12 px-3 py-2 text-xs text-white/70 transition hover:border-white/30"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-1 min-w-0 items-center gap-2 text-sm text-white">
+                              <span className="inline-block h-2 w-2 rounded-full bg-current opacity-80" />
+                              <span className="truncate">{spread.label}</span>
+                            </div>
+                          )}
+
+                          {!isEditing ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setAudience(spread.id, "mesh")}
+                                disabled={isBusy}
+                                className={`rounded-full px-3 py-2 text-xs transition ${
+                                  spread.audience === "mesh"
+                                    ? "bg-black text-white ring-1 ring-white/16"
+                                    : "border border-white/12 text-white/80 hover:border-white/30"
+                                } ${isBusy ? "opacity-50" : ""}`}
+                              >
+                                Mesh
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAudience(spread.id, "commons")}
+                                disabled={isBusy}
+                                className={`rounded-full px-3 py-2 text-xs transition ${
+                                  spread.audience === "commons"
+                                    ? "bg-white text-black shadow-[0_0_18px_rgba(255,255,255,0.35)]"
+                                    : "border border-white/12 text-white/80 hover:border-white/30"
+                                } ${isBusy ? "opacity-50" : ""}`}
+                              >
+                                Commons
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(spread.id);
+                                  setEditLabel(spread.label);
+                                }}
+                                className="rounded-full border border-white/12 px-3 py-2 text-xs text-white/80 transition hover:border-white/30"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteSpread(spread.id)}
+                                disabled={isBusy}
+                                className="rounded-full border border-white/12 px-3 py-2 text-xs text-white/70 transition hover:border-white/30 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       );
                     })
                   )}
