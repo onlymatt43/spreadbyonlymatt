@@ -70,6 +70,11 @@ export default async function NodePage({
     };
   });
 
+  const commonsCard = commonsSpreadItems.slice(0, 4).map((item) => ({
+    icon: item.icon,
+    display: item.display,
+  }));
+
   return (
     <main className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col gap-10 px-6 py-12">
       <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
@@ -79,6 +84,7 @@ export default async function NodePage({
           displayName={normalizedNode.displayName}
           photoUrl={normalizedNode.photoUrl}
           videoUrl={normalizedNode.videoUrl}
+          commons={commonsCard}
         />
 
         <section className="rounded-[2rem] border border-[var(--line)] bg-[var(--panel)] p-8">

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SpreadKind } from "@prisma/client";
 import { NodeCard } from "@/components/node-card";
+import { parseSpreadLink } from "@/lib/utils";
 
 type CabinSpread = {
   id: string;
@@ -171,6 +172,21 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
     return [...mesh, ...commons];
   }, [items]);
 
+  const commonsForCard = useMemo(
+    () =>
+      orderedSpreads
+        .filter((spread) => spread.audience === "commons")
+        .slice(0, 4)
+        .map((spread) => {
+          const parsed = parseSpreadLink(spread.label);
+          return {
+            icon: parsed.icon,
+            display: parsed.display,
+          };
+        }),
+    [orderedSpreads]
+  );
+
   async function addSpread() {
     if (!nodeId || !newSpreadLabel.trim() || addingSpread) {
       return;
@@ -290,6 +306,7 @@ export function OwnerCabin({ nodeId, node, spreads }: OwnerCabinProps) {
             displayName={node.displayName}
             photoUrl={node.photoUrl}
             videoUrl={node.videoUrl}
+            commons={commonsForCard}
           />
         </section>
 

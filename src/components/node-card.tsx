@@ -4,9 +4,17 @@ type NodeCardProps = {
   displayName: string;
   photoUrl: string | null;
   videoUrl: string | null;
+  commons?: { icon: string; display: string }[];
 };
 
-export function NodeCard({ handle, mainLink, displayName, photoUrl, videoUrl }: NodeCardProps) {
+export function NodeCard({
+  handle,
+  mainLink,
+  displayName,
+  photoUrl,
+  videoUrl,
+  commons = [],
+}: NodeCardProps) {
   return (
     <div className="relative rounded-[2.2rem] border border-[var(--line)] bg-[var(--panel)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.08)]">
       <div className="relative h-56 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(135deg,#fff1ae,transparent_55%),linear-gradient(180deg,#161616,#393939)]">
@@ -51,6 +59,22 @@ export function NodeCard({ handle, mainLink, displayName, photoUrl, videoUrl }: 
       >
         {handle}
       </a>
+
+      {commons.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {commons.map((item, index) => (
+            <div
+              key={`${item.display}-${index}`}
+              className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-2 text-sm text-black shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] font-semibold text-white">
+                {item.icon}
+              </span>
+              <span className="truncate max-w-[140px]">{item.display}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
